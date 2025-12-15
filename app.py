@@ -363,13 +363,12 @@ def get_stats():
 # MAIN
 # ------------------------------------------------------------------------------
 
+load_models()
+
 if __name__ == '__main__':
     print("=" * 60)
     print("🍱 Halal Food Scanner API")
     print("=" * 60)
-    
-    # Load models at startup
-    load_models()
     
     print("\n✅ Server ready!")
     print("📱 Open http://localhost:5000 in your browser")
