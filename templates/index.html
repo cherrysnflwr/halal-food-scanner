@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#10b981">
+    <meta name="description" content="Scan Japanese food labels to check if they're Halal, Haram, or Doubtful">
+    
+    <title>Halal Food Scanner</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .upload-area {
+            border: 3px dashed #cbd5e0;
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+
+        .upload-area.dragover {
+            border-color: #10b981;
+            background: #ecfdf5;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+            transition: transform 0.2s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-camera {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-camera:hover {
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .preview {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .preview img {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .results {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .result-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 5px solid;
+        }
+
+        .result-box.halal {
+            background: #ecfdf5;
+            border-color: #10b981;
+        }
+
+        .result-box.haram {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+
+        .result-box.doubtful {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .result-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .ingredient-list {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .ingredient-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ingredient-item.haram {
+            background: #fee2e2;
+        }
+
+        .ingredient-item.doubtful {
+            background: #fef3c7;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.haram {
+            background: #ef4444;
+            color: white;
+        }
+
+        .badge.doubtful {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fef2f2;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+            border-left: 5px solid #ef4444;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #6b7280;
+            margin: 15px 0 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .text-box {
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #4b5563;
+            margin-bottom: 10px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 640px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🕌 Halal Food Scanner</h1>
+            <p>Scan Japanese food labels instantly</p>
+        </div>
+
+        <div class="card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📸</div>
+                <h3>Upload or Take Photo</h3>
+                <p style="color: #6b7280; margin-top: 10px;">Click or drag & drop an image</p>
+                <input type="file" id="fileInput" accept="image/*" capture="environment">
+            </div>
+
+            <button class="btn btn-camera" id="cameraBtn">
+                📷 Open Camera
+            </button>
+
+            <button class="btn" id="analyzeBtn" disabled>
+                🔍 Analyze Label
+            </button>
+
+            <div class="preview" id="preview">
+                <img id="previewImg" alt="Preview">
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analyzing label...</p>
+            </div>
+
+            <div class="error" id="error"></div>
+        </div>
+
+        <div class="results" id="results">
+            <div class="card">
+                <div class="result-box" id="resultBox">
+                    <div class="result-title" id="resultTitle"></div>
+                    <div class="result-content" id="resultContent"></div>
+                    
+                    <div class="section-title">Japanese Text (OCR)</div>
+                    <div class="text-box" id="japaneseText"></div>
+                    
+                    <div class="section-title">English Translation</div>
+                    <div class="text-box" id="translatedText"></div>
+                    
+                    <div id="ingredientsSection" style="display: none;">
+                        <div class="section-title">⚠️ Detected Ingredients</div>
+                        <div class="ingredient-list" id="ingredientList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const cameraBtn = document.getElementById('cameraBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const preview = document.getElementById('preview');
+        const previewImg = document.getElementById('previewImg');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const results = document.getElementById('results');
+
+        // Upload area click
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // Camera button
+        cameraBtn.addEventListener('click', () => {
+            fileInput.setAttribute('capture', 'environment');
+            fileInput.click();
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFile = file;
+                displayPreview(file);
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                selectedFile = file;
+                displayPreview(file);
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        // Display preview
+        function displayPreview(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                preview.style.display = 'block';
+                results.style.display = 'none';
+                error.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Analyze button
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            results.style.display = 'none';
+            analyzeBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'Analysis failed');
+                }
+            } catch (err) {
+                showError('Network error. Please try again.');
+            } finally {
+                loading.style.display = 'none';
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        // Display results
+        function displayResults(data) {
+            const resultBox = document.getElementById('resultBox');
+            const resultTitle = document.getElementById('resultTitle');
+            const resultContent = document.getElementById('resultContent');
+            const japaneseText = document.getElementById('japaneseText');
+            const translatedText = document.getElementById('translatedText');
+            const ingredientsSection = document.getElementById('ingredientsSection');
+            const ingredientList = document.getElementById('ingredientList');
+
+            // Set status styling
+            resultBox.className = 'result-box';
+            if (data.final_decision === 'HARAM') {
+                resultBox.classList.add('haram');
+                resultTitle.innerHTML = '🚫 HARAM - Do Not Consume!';
+                resultContent.innerHTML = 'This product contains ingredients that are prohibited in Islam.';
+            } else if (data.final_decision === 'DOUBTFUL') {
+                resultBox.classList.add('doubtful');
+                resultTitle.innerHTML = '⚠️ DOUBTFUL (Syubhah)';
+                resultContent.innerHTML = 'This product contains ingredients with uncertain halal status. Exercise caution.';
+            } else {
+                resultBox.classList.add('halal');
+                resultTitle.innerHTML = '✅ UNDOUBTFUL';
+                resultContent.innerHTML = 'No prohibited ingredients detected. This appears safe to consume.';
+            }
+
+            // Display texts
+            japaneseText.textContent = data.japanese_text || 'No text detected';
+            translatedText.textContent = data.translated_text || 'Translation unavailable';
+
+            // Display matched ingredients
+            if (data.matched_ingredients && data.matched_ingredients.length > 0) {
+                ingredientsSection.style.display = 'block';
+                ingredientList.innerHTML = data.matched_ingredients.map(item => `
+                    <div class="ingredient-item ${item.status.toLowerCase()}">
+                        <span>${item.ingredient}</span>
+                        <span class="badge ${item.status.toLowerCase()}">${item.status}</span>
+                    </div>
+                `).join('');
+            } else {
+                ingredientsSection.style.display = 'none';
+            }
+
+            results.style.display = 'block';
+        }
+
+        // Show error
+        function showError(message) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+
+        // Service Worker Registration (PWA)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(() => console.log('✅ Service Worker registered'))
+                .catch(err => console.log('❌ SW registration failed:', err));
+        }
+    </script>
+</body>
+</html>
