@@ -3,6 +3,7 @@ Halal Food Scanner - Flask Backend
 FYP: Japanese Snack Label Classification
 """
 
+
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import os
@@ -17,6 +18,24 @@ from PIL import Image
 from deep_translator import GoogleTranslator
 from sentence_transformers import SentenceTransformer
 import torch
+
+def load_models():
+    """Load all models at startup."""
+    global reader, sentence_model, classifier_model, label_encoder, ingredient_dict
+    
+    # --- DEBUGGING START: WHAT DOES RENDER SEE? ---
+    print(f"🕵️ Current Working Directory: {os.getcwd()}")
+    
+    if os.path.exists(MODEL_FOLDER):
+        print(f"📂 Found '{MODEL_FOLDER}' folder. Contents:")
+        print(os.listdir(MODEL_FOLDER))
+    else:
+        print(f"❌ '{MODEL_FOLDER}' folder NOT found in current directory!")
+        print("   Here is what exists in root:", os.listdir('.'))
+    # --- DEBUGGING END ---
+
+    print("🔧 Loading EasyOCR...")
+    # ... rest of your code ...
 
 # ------------------------------------------------------------------------------
 # FIX: Monkey Patch for 'ANTIALIAS' error
