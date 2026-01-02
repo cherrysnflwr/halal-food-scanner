@@ -3,7 +3,6 @@ Halal Food Scanner - Flask Backend
 FYP: Japanese Snack Label Classification
 """
 
-
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import os
@@ -19,30 +18,11 @@ from deep_translator import GoogleTranslator
 from sentence_transformers import SentenceTransformer
 import torch
 
-def load_models():
-    """Load all models at startup."""
-    global reader, sentence_model, classifier_model, label_encoder, ingredient_dict
-    
-    # --- DEBUGGING START: WHAT DOES RENDER SEE? ---
-    print(f"🕵️ Current Working Directory: {os.getcwd()}")
-    
-    if os.path.exists(MODEL_FOLDER):
-        print(f"📂 Found '{MODEL_FOLDER}' folder. Contents:")
-        print(os.listdir(MODEL_FOLDER))
-    else:
-        print(f"❌ '{MODEL_FOLDER}' folder NOT found in current directory!")
-        print("   Here is what exists in root:", os.listdir('.'))
-    # --- DEBUGGING END ---
-
-    print("🔧 Loading EasyOCR...")
-    # ... rest of your code ...
-
 # ------------------------------------------------------------------------------
 # FIX: Monkey Patch for 'ANTIALIAS' error
 # ------------------------------------------------------------------------------
 # Many libraries (like older EasyOCR versions) still try to access 
 # Image.ANTIALIAS which was removed in Pillow 10.0.0. 
-# We manually restore it here to prevent crashes in dependencies.
 if not hasattr(Image, 'ANTIALIAS'):
     try:
         Image.ANTIALIAS = Image.Resampling.LANCZOS
@@ -189,13 +169,10 @@ def predict_snack(image_bytes):
         # 1. Open image with PIL
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")  # ensure 3 channels
 
-        # Resize using modern LANCZOS filter
-
-        # NEW BETTER CODE: Resize while keeping aspect ratio
+        # Resize logic to keep aspect ratio (Optimization)
         max_dimension = 1000
         width, height = img.size
         
-        # Only resize if the image is huge (bigger than 1000px)
         if width > max_dimension or height > max_dimension:
             ratio = min(max_dimension / width, max_dimension / height)
             new_size = (int(width * ratio), int(height * ratio))
@@ -205,8 +182,6 @@ def predict_snack(image_bytes):
             else:
                 img = img.resize(new_size, Image.ANTIALIAS)
         
-        # If it's small enough, just use original size (better for OCR)
-
         # Convert to OpenCV format for EasyOCR
         img_array = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
         
@@ -264,38 +239,30 @@ def predict_snack(image_bytes):
             prediction_label = label_encoder.inverse_transform([prediction_encoded])[0].upper()
             results["model_prediction"] = prediction_label
         else:
-            # Fallback to rule-based only if model not available
+            # Fallback if model missing
             results["model_prediction"] = results["rule_based_status"]
             results["confidence"] = 0.0
         
-        # 6. Final Decision Logic (Prioritize Rules > Model)
+        # 6. Final Decision Logic (FLOW FIX: Safety Priority)
+        # We combine Rules AND Model. If EITHER says Haram, it is Haram.
         
-        # Priority 1: If ANY Haram ingredient exists -> HARAM
-        if results["rule_based_status"] == 'HARAM':
+        # Priority 1: Check for HARAM
+        if results["rule_based_status"] == 'HARAM' or results["model_prediction"] == 'HARAM':
             results["final_decision"] = 'HARAM'
-            # We don't care what the AI model thinks. Rules are absolute.
             
-        # Priority 2: If NO Haram, but DOUBTFUL exists -> DOUBTFUL
-        elif results["rule_based_status"] == 'DOUBTFUL':
+        # Priority 2: Check for DOUBTFUL
+        elif results["rule_based_status"] == 'DOUBTFUL' or results["model_prediction"] == 'DOUBTFUL':
             results["final_decision"] = 'DOUBTFUL'
             
-        # Priority 3: If ingredient list is clean -> UNDOUBTFUL (Permissible)
+        # Priority 3: Clean
         else:
             results["final_decision"] = 'UNDOUBTFUL'
             
-            # OPTIONAL SAFETY CHECK:
-            # If OCR failed (empty text) or found 0 ingredients, you might want to warn the user.
-            # But based on your request, we default to Permissible if nothing bad is found.
-            if len(results["matched_ingredients"]) == 0:
-                 # This ensures we don't accidentally mark it as "Certified Halal"
-                 # It just means "We didn't find anything bad."
-                 pass
-
         return results
 
     except Exception as e:
         results["error"] = f"An error occurred: {str(e)}"
-        print(f"Error in predict_snack: {str(e)}")  # Log to console
+        print(f"Error in predict_snack: {str(e)}")
         return results
 
 
